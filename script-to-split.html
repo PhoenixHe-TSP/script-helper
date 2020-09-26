@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      #input_field {
+        height: 250px;
+        width: 90%;
+        border: 1px solid #000;
+        overflow: scroll;
+      }
+
+      #output_container {
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>剧本转配音稿</h1>
+    <h2>输入</h2>
+    <p id="input_field" contenteditable="true"></p>
+    <br/>
+    <input type="checkbox" id="input_skip_colon" name="input_skip_colon">
+    <label for="input_skip_colon">跳过无冒号行</label>
+    <input type="checkbox" id="input_skip_symbol" name="input_skip_symbol">
+    <label for="input_skip_symbol">跳过结尾非符号行</label>
+    <h2>输出</h2>
+    <button id="input_copy_btn">Copy</button>
+    <div id="output_container">
+      <table id="output_table" style="border: 1px solid black; border-collapse: collapse;font-size: 11px;"></table>
+    </div>
+    <!-- <textarea id="output_field"></textarea> -->
+    <script>
+      let inputField = document.getElementById("input_field");
+
+      let inputSkipColon = document.getElementById("input_skip_colon");
+      let shouldSkipColon = false;
+
+      let inputSkipSymbol = document.getElementById("input_skip_symbol");
+      inputSkipSymbol.checked = true;
+      let shouldSkipSymbol = true;
+
+      let inputCopyBtn = document.getElementById("input_copy_btn");
+
+      let outputContainer = document.getElementById("output_container");
+      let outputTable = document.getElementById("output_table");
+      // let outputField = document.getElementById("output_field");
+
+      inputField.addEventListener("input", onUpdate);
+      inputSkipColon.addEventListener("change", onUpdate);
+      inputSkipSymbol.addEventListener("change", onUpdate);
+
+      inputCopyBtn.addEventListener("click", onCopy);
+
+      function onUpdate() {
+        shouldSkipColon = inputSkipColon.checked;
+        shouldSkipSymbol = inputSkipSymbol.checked;
+        inputCopyBtn.innerText = "Copy";
+        filterRemovedNode();
+        transformScriptSplit(inputField.innerText);
+        // outputField.value = transformScriptSplit(inputField.value);
+      }
+
+      function filterRemovedNode() {
+        let removedNodes = inputField.getElementsByTagName("s");
+        for (let node of removedNodes) {
+          try {
+            node.remove();
+          } catch (e) {
+          }
+        }
+      }
+
+      function onCopy() {
+        let range = new Range();
+        range.setStart(outputContainer, 0);
+        range.setEndAfter(outputContainer);
+        const selection = document.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand("copy");
+        inputCopyBtn.innerText = "Copied";
+      }
+
+      function transformScriptSplit(inputTxt) {
+        outputTable.innerHTML = "";
+        let result = "";
+        for (let line of inputTxt.split("\n")) {
+          let lineResult = transformLine(line);
+          if (Array.isArray(lineResult)) {
+            for (let line of lineResult) {
+              let trLine = document.createElement("tr");
+
+              trLine.appendChild(createTd(line.word));
+              trLine.appendChild(createTd(line.roleState));
+              trLine.appendChild(createTd(line.role));
+
+              outputTable.appendChild(trLine);
+            }
+          }
+        }
+        return result;
+      }
+
+      function createTd(content) {
+        let el = document.createElement("td");
+        el.innerHTML = content;
+        el.style = " border: 1px solid black; border-collapse: collapse;"
+        return el;
+      }
+
+      function transformLine(inputLine) {
+        if (typeof inputLine !== "string") {
+          return undefined;
+        }
+        inputLine = inputLine.trim();
+        if (inputLine.startsWith("[") || inputLine.startsWith("【") || !inputLine) {
+          return undefined;
+        }
+        let splitIdx = inputLine.indexOf("：");
+        if (splitIdx === -1) {
+          splitIdx = inputLine.indexOf(":");
+        }
+        if (splitIdx === -1) {
+          if (shouldSkipColon) {
+            return undefined;
+          }
+          if (shouldSkipSymbol) {
+            let lastChar = inputLine[inputLine.length - 1];
+            let charRegex = /['"～~\.,\u3002\uff1f\uff01\uff0c\u3001\uff1b\uff1a\u201c\u201d\u2018\u2019\uff08\uff09\u300a\u300b\u3008\u3009\u3010\u3011\u300e\u300f\u300c\u300d\ufe43\ufe44\u3014\u3015\u2026\u2014\uff5e\ufe4f\uffe5]/
+            if (charRegex.exec(lastChar) === null) {
+              return undefined;
+            }
+          }
+          splitIdx = -1;
+        }
+
+        let roleDesc = inputLine.substr(0, splitIdx).trim();
+        let roleState = '';
+        let word = inputLine.substr(splitIdx + 1).trim();
+        if (!word) {
+          return undefined;
+        }
+
+        let roleDescRegex = /^(.*)（(.*)）$/;
+        let roleDescMatch = roleDescRegex.exec(roleDesc);
+
+        if (!roleDescMatch) {
+          roleDescRegex = /^(.*)\((.*)\)$/;
+          roleDescMatch = roleDescRegex.exec(roleDesc);
+        }
+
+        if (roleDescMatch) {
+          roleState = roleDescMatch[2];
+          roleDesc = roleDescMatch[1];
+        }
+
+        let roles = roleDesc.split(/[,和&、，]/)
+
+        let ret = [];
+        for (let role of roles) {
+          role = role.trim();
+          role = role.replace(/^\</, '');
+          role = role.replace(/\>$/, '');
+          ret.push({
+            word: word.trim(),
+            roleState: roleState.trim(),
+            role: role
+          });
+        }
+
+        return ret;
+      }
+    </script>
+  </body>
+</html>
