@@ -145,7 +145,7 @@
           return undefined;
         }
         inputLine = inputLine.trim();
-        if ((inputLine.startsWith("[") || inputLine.startsWith("【")) && (inputLine.endsWith("]") || inputLine.endsWith("】")) || !inputLine) {
+        if (inputLine.startsWith("[") || inputLine.startsWith("【") || inputLine.endsWith("]") || inputLine.endsWith("】") || !inputLine) {
           return undefined;
         }
         let splitIdx = inputLine.indexOf("：");
